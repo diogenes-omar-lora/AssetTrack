@@ -554,7 +554,7 @@ export default function MovementsList() {
             <p className="text-sm text-muted-foreground">
               Mostrando <span className="font-medium text-foreground">{displayedMovements.length}</span> de <span className="font-medium text-foreground">{totalCount}</span>
             </p>
-            {sortedMovements.length > itemsPerPage && (
+            {totalCount > itemsPerPage && (
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
