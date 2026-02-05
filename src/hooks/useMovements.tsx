@@ -16,18 +16,34 @@ export interface MovementWithEquipment extends Movement {
   } | null;
 }
 
-export function useMovements() {
+interface UseMovementsParams {
+  page?: number;
+  pageSize?: number;
+  enabled?: boolean;
+}
+
+interface PaginatedMovementsResult {
+  data: MovementWithEquipment[];
+  count: number;
+  totalPages: number;
+}
+
+export function useMovements(params?: UseMovementsParams) {
+  const { page = 1, pageSize = 50, enabled = true } = params || {};
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const {
-    data: movements = [],
+    data,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["movements"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryKey: ["movements", page, pageSize],
+    queryFn: async (): Promise<PaginatedMovementsResult> => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await supabase
         .from("movements")
         .select(`
           *,
@@ -37,13 +53,26 @@ export function useMovements() {
             model,
             type
           )
-        `)
-        .order("movement_date", { ascending: false });
+        `, { count: "exact" })
+        .order("movement_date", { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
-      return data as MovementWithEquipment[];
+      
+      return {
+        data: data as MovementWithEquipment[],
+        count: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize),
+      };
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
+    enabled,
   });
+
+  const movements = data?.data || [];
+  const totalCount = data?.count || 0;
+  const totalPages = data?.totalPages || 1;
 
   const createMovement = useMutation({
     mutationFn: async (newMovement: MovementInsert) => {
@@ -108,11 +137,39 @@ export function useMovements() {
 
   return {
     movements,
+    totalCount,
+    totalPages,
     isLoading,
     error,
     createMovement,
     getRecentMovements,
   };
+}
+
+// Hook para obtener todos los movimientos (usar solo cuando sea necesario, ej: reportes)
+export function useAllMovements() {
+  return useQuery({
+    queryKey: ["movements-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("movements")
+        .select(`
+          *,
+          equipment (
+            serial_number,
+            brand,
+            model,
+            type
+          )
+        `)
+        .order("movement_date", { ascending: false });
+
+      if (error) throw error;
+      return data as MovementWithEquipment[];
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  });
 }
 
 export function useRecentMovements(limit: number = 5) {

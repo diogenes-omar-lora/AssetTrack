@@ -320,11 +320,15 @@ export default function MovementsList() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 50;
 
-  const { movements, isLoading } = useMovements();
+  const { movements, totalCount, totalPages, isLoading } = useMovements({ 
+    page: currentPage, 
+    pageSize: itemsPerPage 
+  });
   const { departments } = useDepartments();
 
+  // Aplicar filtros sobre los datos paginados
   const filteredMovements = movements.filter((mov) => {
     const matchesSearch =
       mov.equipment?.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -348,14 +352,8 @@ export default function MovementsList() {
     setCurrentPage(1);
   }, [searchTerm, originFilter, destFilter, dateFrom, dateTo]);
 
-  const sortedMovements = [...filteredMovements].sort((a, b) =>
-    new Date(b.movement_date).getTime() - new Date(a.movement_date).getTime()
-  );
-  const totalPages = Math.max(1, Math.ceil(sortedMovements.length / itemsPerPage));
-  const paginatedMovements = sortedMovements.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Ya no necesitamos ordenar ni paginar del lado del cliente
+  const displayedMovements = filteredMovements;
 
   return (
     <>
@@ -492,7 +490,7 @@ export default function MovementsList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedMovements.map((movement: MovementWithEquipment) => {
+                  {displayedMovements.map((movement: MovementWithEquipment) => {
                     const Icon = getEquipmentIcon(movement.equipment?.type);
                     return (
                       <tr key={movement.id}>
@@ -554,7 +552,7 @@ export default function MovementsList() {
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
-              Mostrando <span className="font-medium text-foreground">{paginatedMovements.length}</span> de <span className="font-medium text-foreground">{sortedMovements.length}</span>
+              Mostrando <span className="font-medium text-foreground">{displayedMovements.length}</span> de <span className="font-medium text-foreground">{totalCount}</span>
             </p>
             {sortedMovements.length > itemsPerPage && (
               <div className="flex flex-wrap items-center gap-2">

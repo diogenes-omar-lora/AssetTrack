@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useUserRoles";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -209,6 +209,10 @@ export function AppSidebar() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0 bg-sidebar">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Menu</SheetTitle>
+              <SheetDescription>Navegacion principal</SheetDescription>
+            </SheetHeader>
             <SidebarContent onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>

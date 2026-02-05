@@ -69,11 +69,19 @@ export default function EquipmentList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 50;
 
-  const { equipment, isLoading, deleteEquipment } = useEquipment();
+  const { equipment, totalCount, totalPages, isLoading, deleteEquipment } = useEquipment({ 
+    page: currentPage, 
+    pageSize: itemsPerPage 
+  });
   const { types } = useEquipmentTypes();
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, statusFilter]);
+
+  // Aplicar filtros locales sobre los datos paginados
   const filteredEquipment = equipment.filter((eq) => {
     const matchesSearch =
       eq.serial_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -85,21 +93,8 @@ export default function EquipmentList() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, typeFilter, statusFilter]);
-
-  const sortedEquipment = [...filteredEquipment].sort((a, b) => {
-    const dateA = new Date((a as { created_at?: string }).created_at || a.acquisition_date || 0).getTime();
-    const dateB = new Date((b as { created_at?: string }).created_at || b.acquisition_date || 0).getTime();
-    return dateB - dateA;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sortedEquipment.length / itemsPerPage));
-  const paginatedEquipment = sortedEquipment.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Ya no necesitamos ordenar ni paginar del lado del cliente
+  const displayedEquipment = filteredEquipment;
 
   const handleDelete = () => {
     if (deleteId) {
@@ -192,7 +187,7 @@ export default function EquipmentList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedEquipment.map((equipment) => {
+                  {displayedEquipment.map((equipment) => {
                     const Icon = getEquipmentIcon(equipment.type);
                     return (
                       <tr key={equipment.id}>
@@ -263,9 +258,9 @@ export default function EquipmentList() {
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">
             <p className="text-sm text-muted-foreground">
-              Mostrando <span className="font-medium text-foreground">{paginatedEquipment.length}</span> de <span className="font-medium text-foreground">{sortedEquipment.length}</span>
+              Mostrando <span className="font-medium text-foreground">{displayedEquipment.length}</span> de <span className="font-medium text-foreground">{totalCount}</span>
             </p>
-            {sortedEquipment.length > itemsPerPage && (
+            {totalCount > itemsPerPage && (
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"

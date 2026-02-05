@@ -8,26 +8,55 @@ type Equipment = Database["public"]["Tables"]["equipment"]["Row"];
 type EquipmentInsert = Database["public"]["Tables"]["equipment"]["Insert"];
 type EquipmentUpdate = Database["public"]["Tables"]["equipment"]["Update"];
 
-export function useEquipment() {
+interface UseEquipmentParams {
+  page?: number;
+  pageSize?: number;
+  enabled?: boolean;
+}
+
+interface PaginatedEquipmentResult {
+  data: Equipment[];
+  count: number;
+  totalPages: number;
+}
+
+export function useEquipment(params?: UseEquipmentParams) {
+  const { page = 1, pageSize = 50, enabled = true } = params || {};
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const {
-    data: equipment = [],
+    data,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["equipment"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryKey: ["equipment", page, pageSize],
+    queryFn: async (): Promise<PaginatedEquipmentResult> => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error, count } = await supabase
         .from("equipment")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
-      return data as Equipment[];
+      
+      return {
+        data: data as Equipment[],
+        count: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize),
+      };
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
+    enabled,
   });
+
+  const equipment = data?.data || [];
+  const totalCount = data?.count || 0;
+  const totalPages = data?.totalPages || 1;
 
   const createEquipment = useMutation({
     mutationFn: async (newEquipment: EquipmentInsert) => {
@@ -125,6 +154,8 @@ export function useEquipment() {
 
   return {
     equipment,
+    totalCount,
+    totalPages,
     isLoading,
     error,
     createEquipment,
@@ -132,6 +163,24 @@ export function useEquipment() {
     deleteEquipment,
     getEquipmentById,
   };
+}
+
+// Hook para obtener todos los equipos (usar solo cuando sea necesario)
+export function useAllEquipment() {
+  return useQuery({
+    queryKey: ["equipment-all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("equipment")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data as Equipment[];
+    },
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 10,
+  });
 }
 
 export function useEquipmentStats() {
@@ -172,5 +221,7 @@ export function useEquipmentStats() {
 
       return { total, assigned, available, inRepair, byType, byDepartment };
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
   });
 }

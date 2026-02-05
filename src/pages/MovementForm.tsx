@@ -14,14 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMovements } from "@/hooks/useMovements";
-import { useEquipment } from "@/hooks/useEquipment";
+import { useAllEquipment } from "@/hooks/useEquipment";
 import { useAuth } from "@/hooks/useAuth";
 import { useDepartments } from "@/hooks/useDepartments";
 
 export default function MovementForm() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { equipment } = useEquipment();
+  const { data: equipment = [] } = useAllEquipment();
   const { departments } = useDepartments();
   const { createMovement } = useMovements();
 

@@ -138,11 +138,15 @@ function DepartmentChart({ data, total, selectedBuilding }: DepartmentChartProps
 
 export default function Dashboard() {
   const { data: statsData, isLoading: statsLoading } = useEquipmentStats();
-  const { movements, isLoading: movementsLoading } = useMovements();
   const { departments } = useDepartments();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBuilding, setSelectedBuilding] = useState<string>("all");
   const itemsPerPage = 10;
+  
+  const { movements, totalCount, totalPages, isLoading: movementsLoading } = useMovements({ 
+    page: currentPage, 
+    pageSize: itemsPerPage 
+  });
 
   // Obtener edificios únicos
   const buildings = useMemo(() => {
@@ -172,19 +176,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [movements.length]);
+  }, [totalCount]);
 
-  const sortedMovements = useMemo(() => {
-    return [...movements].sort(
-      (a, b) => new Date(b.movement_date).getTime() - new Date(a.movement_date).getTime()
-    );
-  }, [movements]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedMovements.length / itemsPerPage));
-  const paginatedMovements = sortedMovements.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  // Los movimientos ya vienen ordenados y paginados del servidor
+  const displayedMovements = movements;
 
   const stats = [
     {
@@ -363,7 +358,7 @@ export default function Dashboard() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : sortedMovements.length === 0 ? (
+          ) : displayedMovements.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <ClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>No hay movimientos registrados aún.</p>
@@ -383,7 +378,7 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedMovements.map((movement: MovementWithEquipment) => {
+                {displayedMovements.map((movement: MovementWithEquipment) => {
                   const Icon = movement.equipment ? getEquipmentIcon(movement.equipment.type) : Monitor;
                   return (
                     <tr key={movement.id}>
@@ -428,10 +423,10 @@ export default function Dashboard() {
               </tbody>
             </table>
           )}
-          {sortedMovements.length > itemsPerPage && (
+          {totalCount > itemsPerPage && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">
               <p className="text-sm text-muted-foreground">
-                Mostrando <span className="font-medium text-foreground">{paginatedMovements.length}</span> de <span className="font-medium text-foreground">{sortedMovements.length}</span>
+                Mostrando <span className="font-medium text-foreground">{displayedMovements.length}</span> de <span className="font-medium text-foreground">{totalCount}</span>
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <Button

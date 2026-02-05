@@ -11,8 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useEquipment, useEquipmentStats } from "@/hooks/useEquipment";
-import { useMovements } from "@/hooks/useMovements";
+import { useAllEquipment, useEquipmentStats } from "@/hooks/useEquipment";
+import { useAllMovements } from "@/hooks/useMovements";
 import { format, subDays, subMonths, startOfYear, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -56,9 +56,9 @@ export default function Reports() {
   const [originDept, setOriginDept] = useState("all");
   const [destDept, setDestDept] = useState("all");
 
-  const { equipment, isLoading } = useEquipment();
+  const { data: equipment = [], isLoading } = useAllEquipment();
   const { data: stats, isLoading: statsLoading } = useEquipmentStats();
-  const { movements, isLoading: movementsLoading } = useMovements();
+  const { data: movements = [], isLoading: movementsLoading } = useAllMovements();
 
   // Get unique departments from equipment data
   const departments = useMemo(() => {
