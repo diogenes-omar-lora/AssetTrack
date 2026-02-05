@@ -29,9 +29,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useEquipment } from "@/hooks/useEquipment";
 import { useEquipmentTypes } from "@/hooks/useEquipmentTypes";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Database } from "@/integrations/supabase/types";
+import {
+  ResponsiveTable,
+  ResponsiveTableRow,
+  ResponsiveTableCell,
+  ResponsiveTableHead,
+  ResponsiveTableHeaderCell,
+} from "@/components/ui/responsive-table";
 
 type EquipmentType = Database["public"]["Enums"]["equipment_type"];
 type EquipmentStatus = Database["public"]["Enums"]["equipment_status"];
@@ -70,6 +78,7 @@ export default function EquipmentList() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const isMobile = useIsMobile();
 
   const { equipment, totalCount, totalPages, isLoading, deleteEquipment } = useEquipment({ 
     page: currentPage, 
@@ -157,103 +166,223 @@ export default function EquipmentList() {
 
         {/* Table */}
         <div className="stat-card overflow-hidden">
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="p-4 space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : filteredEquipment.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Monitor className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No se encontraron equipos.</p>
-                <Link to="/equipos/nuevo" className="text-primary hover:underline text-sm">
-                  Agregar primer equipo
-                </Link>
-              </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th>Número de Serie</th>
-                    <th>Tipo</th>
-                    <th>Marca / Modelo</th>
-                    <th>Departamento</th>
-                    <th>Asignado A</th>
-                    <th>Código de Activo</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedEquipment.map((equipment) => {
-                    const Icon = getEquipmentIcon(equipment.type);
-                    return (
-                      <tr key={equipment.id}>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-lg">
-                              <Icon className="h-4 w-4 text-muted-foreground" />
+          {isLoading ? (
+            <div className="p-4 space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : filteredEquipment.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Monitor className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No se encontraron equipos.</p>
+              <Link to="/equipos/nuevo" className="text-primary hover:underline text-sm">
+                Agregar primer equipo
+              </Link>
+            </div>
+          ) : (
+            <ResponsiveTable
+              isMobile={isMobile}
+              columns={[
+                "Equipo",
+                "Número de Serie",
+                "Tipo",
+                "Edificio",
+                "Departamento",
+                "Asignado A",
+                "Estado",
+                "Acciones",
+              ]}
+            >
+              {isMobile ? (
+                displayedEquipment.map((equipment) => {
+                  const Icon = getEquipmentIcon(equipment.type);
+                  return (
+                    <ResponsiveTableRow
+                      key={equipment.id}
+                      isMobile
+                      label={`Equipo ${equipment.serial_number}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-lg">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {equipment.brand} {equipment.model}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Código: {equipment.asset_code || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <ResponsiveTableCell isMobile label="Número de Serie">
+                        {equipment.serial_number}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Tipo">
+                        {equipment.type}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Edificio">
+                        {equipment.current_building || "-"}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Departamento">
+                        {equipment.current_department || "-"}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Asignado A">
+                        {equipment.current_assignee ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                              {equipment.current_assignee
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
                             </div>
-                            <span className="font-medium text-foreground">{equipment.serial_number}</span>
+                            <span className="text-foreground">
+                              {equipment.current_assignee}
+                            </span>
                           </div>
-                        </td>
-                        <td className="text-foreground">{equipment.type}</td>
-                        <td className="text-foreground">{equipment.brand} {equipment.model}</td>
-                        <td className="text-foreground">{equipment.current_department || "-"}</td>
-                        <td>
-                          {equipment.current_assignee ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                {equipment.current_assignee
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
+                        ) : (
+                          <span className="text-muted-foreground italic">Sin asignar</span>
+                        )}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Estado">
+                        <StatusBadge status={equipment.status} />
+                      </ResponsiveTableCell>
+                      <div className="flex justify-end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9"
+                              aria-label="Acciones del equipo"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/equipos/${equipment.id}/editar`}>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Editar
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setDeleteId(equipment.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </ResponsiveTableRow>
+                  );
+                })
+              ) : (
+                <>
+                  <ResponsiveTableHead isMobile={false}>
+                    <tr className="border-b border-border">
+                      <ResponsiveTableHeaderCell>Equipo</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Número de Serie</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Tipo</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Edificio</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Departamento</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Asignado A</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Estado</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Acciones</ResponsiveTableHeaderCell>
+                    </tr>
+                  </ResponsiveTableHead>
+                  <tbody>
+                    {displayedEquipment.map((equipment) => {
+                      const Icon = getEquipmentIcon(equipment.type);
+                      return (
+                        <ResponsiveTableRow key={equipment.id} isMobile={false}>
+                          <ResponsiveTableCell isMobile={false}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-muted rounded-lg">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
                               </div>
-                              <span className="text-foreground">{equipment.current_assignee}</span>
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {equipment.brand} {equipment.model}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Código: {equipment.asset_code || "N/A"}
+                                </p>
+                              </div>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground italic">Sin asignar</span>
-                          )}
-                        </td>
-                        <td className="text-muted-foreground">
-                          {equipment.asset_code || "-"}
-                        </td>
-                        <td>
-                          <StatusBadge status={equipment.status} />
-                        </td>
-                        <td>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link to={`/equipos/${equipment.id}/editar`}>
-                                  <Edit2 className="h-4 w-4 mr-2" />
-                                  Editar
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => setDeleteId(equipment.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <span className="font-medium text-foreground">
+                              {equipment.serial_number}
+                            </span>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            {equipment.type}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            {equipment.current_building || "-"}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            {equipment.current_department || "-"}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            {equipment.current_assignee ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                  {equipment.current_assignee
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </div>
+                                <span className="text-foreground">{equipment.current_assignee}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic">Sin asignar</span>
+                            )}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <StatusBadge status={equipment.status} />
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="Acciones del equipo"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link to={`/equipos/${equipment.id}/editar`}>
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => setDeleteId(equipment.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </ResponsiveTableCell>
+                        </ResponsiveTableRow>
+                      );
+                    })}
+                  </tbody>
+                </>
+              )}
+            </ResponsiveTable>
+          )}
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">

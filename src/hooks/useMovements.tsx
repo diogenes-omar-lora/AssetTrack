@@ -13,6 +13,8 @@ export interface MovementWithEquipment extends Movement {
     brand: string;
     model: string;
     type: Database["public"]["Enums"]["equipment_type"];
+    asset_code: string | null;
+    current_building: string | null;
   } | null;
 }
 
@@ -51,7 +53,9 @@ export function useMovements(params?: UseMovementsParams) {
             serial_number,
             brand,
             model,
-            type
+            type,
+            asset_code,
+            current_building
           )
         `, { count: "exact" })
         .order("movement_date", { ascending: false })
@@ -84,11 +88,19 @@ export function useMovements(params?: UseMovementsParams) {
 
       if (error) throw error;
 
-      // Update equipment's current department
+      // Obtener el edificio del departamento de destino
+      const { data: deptData } = await supabase
+        .from("departments")
+        .select("building")
+        .eq("name", newMovement.destination_department)
+        .single();
+
+      // Update equipment's current department and building
       await supabase
         .from("equipment")
         .update({
           current_department: newMovement.destination_department,
+          current_building: deptData?.building?.toLowerCase() || null,
           current_assignee: newMovement.recipient,
           status: "Asignado",
         })
@@ -125,7 +137,9 @@ export function useMovements(params?: UseMovementsParams) {
           serial_number,
           brand,
           model,
-          type
+          type,
+          asset_code,
+          current_building
         )
       `)
       .order("movement_date", { ascending: false })
@@ -159,7 +173,9 @@ export function useAllMovements() {
             serial_number,
             brand,
             model,
-            type
+            type,
+            asset_code,
+            current_building
           )
         `)
         .order("movement_date", { ascending: false });
@@ -184,7 +200,9 @@ export function useRecentMovements(limit: number = 5) {
             serial_number,
             brand,
             model,
-            type
+            type,
+            asset_code,
+            current_building
           )
         `)
         .order("movement_date", { ascending: false })

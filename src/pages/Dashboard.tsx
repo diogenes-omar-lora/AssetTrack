@@ -148,6 +148,12 @@ export default function Dashboard() {
     pageSize: itemsPerPage 
   });
 
+  // Helper para obtener el edificio del departamento destino
+  const getDestinationBuilding = (destinationDept: string) => {
+    const dept = departments.find((d) => d.name === destinationDept);
+    return dept?.building || "-";
+  };
+
   // Obtener edificios únicos
   const buildings = useMemo(() => {
     const uniqueBuildings = Array.from(
@@ -373,6 +379,7 @@ export default function Dashboard() {
                   <th>Fecha</th>
                   <th>Equipo</th>
                   <th>Destinatario</th>
+                  <th>Edificio</th>
                   <th>Dept. Destino</th>
                   <th>Estado</th>
                 </tr>
@@ -397,7 +404,7 @@ export default function Dashboard() {
                                 : "Equipo eliminado"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              S/N: {movement.equipment?.serial_number || "N/A"}
+                              Código: {movement.equipment?.asset_code || "N/A"}
                             </p>
                           </div>
                         </div>
@@ -413,6 +420,7 @@ export default function Dashboard() {
                           <span className="text-foreground">{movement.recipient}</span>
                         </div>
                       </td>
+                      <td className="text-foreground">{getDestinationBuilding(movement.destination_department)}</td>
                       <td className="text-foreground">{movement.destination_department}</td>
                       <td>
                         <StatusBadge status="assigned" />

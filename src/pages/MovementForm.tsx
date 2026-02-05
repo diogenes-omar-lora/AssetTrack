@@ -17,6 +17,7 @@ import { useMovements } from "@/hooks/useMovements";
 import { useAllEquipment } from "@/hooks/useEquipment";
 import { useAuth } from "@/hooks/useAuth";
 import { useDepartments } from "@/hooks/useDepartments";
+import { useToast } from "@/hooks/use-toast";
 
 export default function MovementForm() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function MovementForm() {
   const { data: equipment = [] } = useAllEquipment();
   const { departments } = useDepartments();
   const { createMovement } = useMovements();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,6 +87,28 @@ export default function MovementForm() {
     e.preventDefault();
 
     if (selectedEquipmentIds.length === 0 || !formData.originBuilding || !formData.originDept || !formData.destBuilding || !formData.destDept || !formData.recipient) {
+      return;
+    }
+
+    // VALIDACIÓN: Verificar compatibilidad edificio-departamento para origen
+    const originDeptInfo = departments.find((d) => d.name === formData.originDept);
+    if (!originDeptInfo || originDeptInfo.building !== formData.originBuilding) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: `El departamento origen "${formData.originDept}" no pertenece al edificio "${formData.originBuilding}".`,
+      });
+      return;
+    }
+
+    // VALIDACIÓN: Verificar compatibilidad edificio-departamento para destino
+    const destDeptInfo = departments.find((d) => d.name === formData.destDept);
+    if (!destDeptInfo || destDeptInfo.building !== formData.destBuilding) {
+      toast({
+        variant: "destructive",
+        title: "Error de validación",
+        description: `El departamento destino "${formData.destDept}" no pertenece al edificio "${formData.destBuilding}".`,
+      });
       return;
     }
 

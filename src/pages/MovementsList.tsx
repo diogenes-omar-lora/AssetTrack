@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, Filter, Monitor, Calendar, Laptop, Phone, Printer } from "lucide-react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
@@ -14,8 +13,16 @@ import {
 } from "@/components/ui/select";
 import { useMovements, MovementWithEquipment } from "@/hooks/useMovements";
 import { useDepartments } from "@/hooks/useDepartments";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import {
+  ResponsiveTable,
+  ResponsiveTableRow,
+  ResponsiveTableCell,
+  ResponsiveTableHead,
+  ResponsiveTableHeaderCell,
+} from "@/components/ui/responsive-table";
 
 const StatusBadge = ({ status }: { status: string }) => {
   const isCompleted = status === "completed";
@@ -321,6 +328,7 @@ export default function MovementsList() {
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const isMobile = useIsMobile();
 
   const { movements, totalCount, totalPages, isLoading } = useMovements({ 
     page: currentPage, 
@@ -328,10 +336,17 @@ export default function MovementsList() {
   });
   const { departments } = useDepartments();
 
+  // Helper para obtener el edificio del departamento destino
+  const getDestinationBuilding = (destinationDept: string) => {
+    const dept = departments.find((d) => d.name === destinationDept);
+    return dept?.building || "-";
+  };
+
   // Aplicar filtros sobre los datos paginados
   const filteredMovements = movements.filter((mov) => {
     const matchesSearch =
       mov.equipment?.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mov.equipment?.asset_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       mov.equipment?.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       mov.recipient.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesOrigin = originFilter === "all" || mov.origin_department === originFilter;
@@ -444,7 +459,7 @@ export default function MovementsList() {
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por serial o destinatario..."
+              placeholder="Buscar por código, marca o destinatario..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -460,94 +475,187 @@ export default function MovementsList() {
 
         {/* Table */}
         <div className="stat-card overflow-hidden">
-          <div className="overflow-x-auto">
-            {isLoading ? (
-              <div className="p-4 space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : filteredMovements.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Monitor className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No se encontraron movimientos.</p>
-                <Link to="/movimientos/nuevo" className="text-primary hover:underline text-sm">
-                  Registrar primer movimiento
-                </Link>
-              </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th>Fecha</th>
-                    <th>Equipo</th>
-                    <th>Destinatario</th>
-                    <th>Dept. Origen</th>
-                    <th>Dept. Destino</th>
-                    <th>Asignador</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayedMovements.map((movement: MovementWithEquipment) => {
-                    const Icon = getEquipmentIcon(movement.equipment?.type);
-                    return (
-                      <tr key={movement.id}>
-                        <td className="text-muted-foreground">
-                          {format(new Date(movement.movement_date), "MMM dd, yyyy")}
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-lg">
-                              <Icon className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {movement.equipment
-                                  ? `${movement.equipment.brand} ${movement.equipment.model}`
-                                  : "Equipo eliminado"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                S/N: {movement.equipment?.serial_number || "N/A"}
-                              </p>
-                            </div>
+          {isLoading ? (
+            <div className="p-4 space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : filteredMovements.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Monitor className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No se encontraron movimientos.</p>
+              <Link to="/movimientos/nuevo" className="text-primary hover:underline text-sm">
+                Registrar primer movimiento
+              </Link>
+            </div>
+          ) : (
+            <ResponsiveTable
+              isMobile={isMobile}
+              columns={[
+                "Fecha",
+                "Equipo",
+                "Edificio",
+                "Destinatario",
+                "Dept. Origen",
+                "Dept. Destino",
+                "Asignador",
+                "Estado",
+                "Acciones",
+              ]}
+            >
+              {isMobile ? (
+                displayedMovements.map((movement: MovementWithEquipment) => {
+                  const Icon = getEquipmentIcon(movement.equipment?.type);
+                  return (
+                    <ResponsiveTableRow
+                      key={movement.id}
+                      isMobile
+                      label={`Movimiento ${movement.id}`}
+                    >
+                      <ResponsiveTableCell isMobile label="Fecha">
+                        {format(new Date(movement.movement_date), "MMM dd, yyyy")}
+                      </ResponsiveTableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-lg">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {movement.equipment
+                              ? `${movement.equipment.brand} ${movement.equipment.model}`
+                              : "Equipo eliminado"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Código: {movement.equipment?.asset_code || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <ResponsiveTableCell isMobile label="Edificio">
+                        {getDestinationBuilding(movement.destination_department)}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Destinatario">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                            {movement.recipient
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
                           </div>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                              {movement.recipient
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
+                          <span className="text-foreground">{movement.recipient}</span>
+                        </div>
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Dept. Origen">
+                        {movement.origin_department}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Dept. Destino">
+                        {movement.destination_department}
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Asignador">
+                        <span className="text-muted-foreground">{movement.assigner_name}</span>
+                      </ResponsiveTableCell>
+                      <ResponsiveTableCell isMobile label="Estado">
+                        <StatusBadge status="completed" />
+                      </ResponsiveTableCell>
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handlePrintMovement(movement)}
+                          title="Imprimir movimiento"
+                          aria-label="Imprimir movimiento"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </ResponsiveTableRow>
+                  );
+                })
+              ) : (
+                <>
+                  <ResponsiveTableHead isMobile={false}>
+                    <tr className="border-b border-border">
+                      <ResponsiveTableHeaderCell>Fecha</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Equipo</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Edificio</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Destinatario</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Dept. Origen</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Dept. Destino</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Asignador</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Estado</ResponsiveTableHeaderCell>
+                      <ResponsiveTableHeaderCell>Acciones</ResponsiveTableHeaderCell>
+                    </tr>
+                  </ResponsiveTableHead>
+                  <tbody>
+                    {displayedMovements.map((movement: MovementWithEquipment) => {
+                      const Icon = getEquipmentIcon(movement.equipment?.type);
+                      return (
+                        <ResponsiveTableRow key={movement.id} isMobile={false}>
+                          <ResponsiveTableCell isMobile={false} className="text-muted-foreground">
+                            {format(new Date(movement.movement_date), "MMM dd, yyyy")}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-muted rounded-lg">
+                                <Icon className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {movement.equipment
+                                    ? `${movement.equipment.brand} ${movement.equipment.model}`
+                                    : "Equipo eliminado"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Código: {movement.equipment?.asset_code || "N/A"}
+                                </p>
+                              </div>
                             </div>
-                            <span className="text-foreground">{movement.recipient}</span>
-                          </div>
-                        </td>
-                        <td className="text-foreground">{movement.origin_department}</td>
-                        <td className="text-foreground">{movement.destination_department}</td>
-                        <td className="text-muted-foreground">{movement.assigner_name}</td>
-                        <td>
-                          <StatusBadge status="completed" />
-                        </td>
-                        <td>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePrintMovement(movement)}
-                            title="Imprimir movimiento"
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false} className="text-foreground">
+                            {getDestinationBuilding(movement.destination_department)}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                {movement.recipient
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </div>
+                              <span className="text-foreground">{movement.recipient}</span>
+                            </div>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false} className="text-foreground">
+                            {movement.origin_department}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false} className="text-foreground">
+                            {movement.destination_department}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false} className="text-muted-foreground">
+                            {movement.assigner_name}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <StatusBadge status="completed" />
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile={false}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePrintMovement(movement)}
+                              title="Imprimir movimiento"
+                              aria-label="Imprimir movimiento"
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </ResponsiveTableCell>
+                        </ResponsiveTableRow>
+                      );
+                    })}
+                  </tbody>
+                </>
+              )}
+            </ResponsiveTable>
+          )}
 
           {/* Pagination */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-4 border-t border-border">

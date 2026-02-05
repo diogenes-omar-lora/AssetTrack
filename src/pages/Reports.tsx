@@ -13,8 +13,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAllEquipment, useEquipmentStats } from "@/hooks/useEquipment";
 import { useAllMovements } from "@/hooks/useMovements";
+import { useDepartments } from "@/hooks/useDepartments";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { format, subDays, subMonths, startOfYear, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
+import {
+  ResponsiveTable,
+  ResponsiveTableRow,
+  ResponsiveTableCell,
+  ResponsiveTableHead,
+  ResponsiveTableHeaderCell,
+} from "@/components/ui/responsive-table";
 
 const StatusBadge = ({ status }: { status: string }) => {
   const statusClasses: Record<string, string> = {
@@ -50,6 +59,7 @@ export default function Reports() {
   const [department, setDepartment] = useState("all");
   const [equipmentType, setEquipmentType] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const isMobile = useIsMobile();
   
   // Movement filters
   const [movementDateRange, setMovementDateRange] = useState("all");
@@ -59,6 +69,13 @@ export default function Reports() {
   const { data: equipment = [], isLoading } = useAllEquipment();
   const { data: stats, isLoading: statsLoading } = useEquipmentStats();
   const { data: movements = [], isLoading: movementsLoading } = useAllMovements();
+  const { departments: departmentsList } = useDepartments();
+
+  // Helper para obtener el edificio del departamento destino
+  const getDestinationBuilding = (destinationDept: string) => {
+    const dept = departmentsList.find((d) => d.name === destinationDept);
+    return dept?.building || "-";
+  };
 
   // Get unique departments from equipment data
   const departments = useMemo(() => {
@@ -173,17 +190,14 @@ export default function Reports() {
   }, [movements, movementDateRange, originDept, destDept]);
 
   const handleExportEquipmentCSV = () => {
-    const headers = ["Número de Serie", "Código de Activo", "Marca", "Modelo", "Tipo", "Asignado A", "Departamento", "Edificio", "Fecha Adquisición", "Estado"];
     const rows = filteredEquipment.map((item) => ({
-      "Número de Serie": item.serial_number,
+      "Equipo": `${item.brand} ${item.model}`,
       "Código de Activo": item.asset_code || "-",
-      "Marca": item.brand,
-      "Modelo": item.model,
+      "Número de Serie": item.serial_number,
       "Tipo": item.type,
-      "Asignado A": item.current_assignee || "Sin asignar",
-      "Departamento": item.current_department || "Sin departamento",
       "Edificio": item.current_building || "-",
-      "Fecha Adquisición": item.acquisition_date ? format(new Date(item.acquisition_date), "dd/MM/yyyy") : "N/A",
+      "Departamento": item.current_department || "Sin departamento",
+      "Asignado A": item.current_assignee || "Sin asignar",
       "Estado": item.status,
     }));
 
@@ -197,7 +211,8 @@ export default function Reports() {
     const rows = filteredMovements.map((item) => ({
       "Fecha": format(new Date(item.movement_date), "dd/MM/yyyy HH:mm"),
       "Equipo": item.equipment ? `${item.equipment.brand} ${item.equipment.model}` : "N/A",
-      "Número de Serie": item.equipment?.serial_number || "N/A",
+      "Código de Activo": item.equipment?.asset_code || "N/A",
+      "Edificio": getDestinationBuilding(item.destination_department),
       "Origen": item.origin_department,
       "Destino": item.destination_department,
       "Receptor": item.recipient,
@@ -402,67 +417,138 @@ export default function Reports() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
-                    <table className="data-table">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th>Número de Serie</th>
-                          <th>Equipo</th>
-                          <th>Tipo</th>
-                          <th>Asignado A</th>
-                          <th>Departamento</th>
-                          <th>Edificio</th>
-                          <th>Fecha Adquisición</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredEquipment.map((item) => (
-                          <tr key={item.id}>
-                            <td>
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-muted rounded-lg">
-                                  <EquipmentIcon type={item.type} />
+                  <ResponsiveTable
+                    isMobile={isMobile}
+                    columns={[
+                      "Equipo",
+                      "Numero de Serie",
+                      "Tipo",
+                      "Edificio",
+                      "Departamento",
+                      "Asignado A",
+                      "Estado",
+                    ]}
+                  >
+                    {isMobile ? (
+                      filteredEquipment.map((item) => (
+                        <ResponsiveTableRow key={item.id} isMobile label={`Equipo ${item.serial_number}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-muted rounded-lg">
+                              <EquipmentIcon type={item.type} />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {item.brand} {item.model}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Código: {item.asset_code || "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                          <ResponsiveTableCell isMobile label="Numero de Serie">
+                            {item.serial_number}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Tipo">
+                            {item.type}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Edificio">
+                            {item.current_building || "-"}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Departamento">
+                            {item.current_department || "N/A"}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Asignado A">
+                            {item.current_assignee ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                  {item.current_assignee
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
                                 </div>
-                                <span className="font-medium text-foreground">{item.serial_number}</span>
+                                <span className="text-foreground">{item.current_assignee}</span>
                               </div>
-                            </td>
-                            <td className="text-foreground">{item.brand} {item.model}</td>
-                            <td className="text-foreground">{item.type}</td>
-                            <td>
-                              {item.current_assignee ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                    {item.current_assignee
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")
-                                      .slice(0, 2)
-                                      .toUpperCase()}
-                                  </div>
-                                  <span className="text-foreground">{item.current_assignee}</span>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground italic">Sin asignar</span>
-                              )}
-                            </td>
-                            <td className="text-foreground">{item.current_department || <span className="text-muted-foreground italic">N/A</span>}</td>
-                            <td className="text-foreground">{item.current_building || <span className="text-muted-foreground italic">-</span>}</td>
-                            <td className="text-muted-foreground">
-                              {item.acquisition_date
-                                ? format(new Date(item.acquisition_date), "dd MMM yyyy", { locale: es })
-                                : "N/A"}
-                            </td>
-                            <td>
-                              <StatusBadge status={item.status} />
-                            </td>
+                            ) : (
+                              <span className="text-muted-foreground italic">Sin asignar</span>
+                            )}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Estado">
+                            <StatusBadge status={item.status} />
+                          </ResponsiveTableCell>
+                        </ResponsiveTableRow>
+                      ))
+                    ) : (
+                      <>
+                        <ResponsiveTableHead isMobile={false}>
+                          <tr className="border-b border-border">
+                            <ResponsiveTableHeaderCell>Equipo</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Numero de Serie</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Tipo</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Edificio</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Departamento</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Asignado A</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Estado</ResponsiveTableHeaderCell>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </ResponsiveTableHead>
+                        <tbody>
+                          {filteredEquipment.map((item) => (
+                            <ResponsiveTableRow key={item.id} isMobile={false}>
+                              <ResponsiveTableCell isMobile={false}>
+                                <div className="flex items-center gap-3">
+                                  <div className="p-2 bg-muted rounded-lg">
+                                    <EquipmentIcon type={item.type} />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-foreground">
+                                      {item.brand} {item.model}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Código: {item.asset_code || "N/A"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground">
+                                <span className="font-medium">{item.serial_number}</span>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground">
+                                {item.type}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground">
+                                {item.current_building || <span className="text-muted-foreground italic">-</span>}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground">
+                                {item.current_department || <span className="text-muted-foreground italic">N/A</span>}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                {item.current_assignee ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                      {item.current_assignee
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")
+                                        .slice(0, 2)
+                                        .toUpperCase()}
+                                    </div>
+                                    <span className="text-foreground">{item.current_assignee}</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Sin asignar</span>
+                                )}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                <StatusBadge status={item.status} />
+                              </ResponsiveTableCell>
+                            </ResponsiveTableRow>
+                          ))}
+                        </tbody>
+                      </>
+                    )}
+                  </ResponsiveTable>
 
-                  {/* Results count */}
                   <div className="flex items-center justify-between px-4 py-4 border-t border-border">
                     <p className="text-sm text-muted-foreground">
                       Mostrando <span className="font-medium text-foreground">{filteredEquipment.length}</span> de{" "}
@@ -555,81 +641,160 @@ export default function Reports() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
-                    <table className="data-table">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th>Fecha</th>
-                          <th>Equipo</th>
-                          <th>Origen</th>
-                          <th>Destino</th>
-                          <th>Receptor</th>
-                          <th>Responsable</th>
-                          <th>Descripción</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredMovements.map((item) => (
-                          <tr key={item.id}>
-                            <td className="text-foreground whitespace-nowrap">
-                              {format(new Date(item.movement_date), "dd MMM yyyy", { locale: es })}
-                              <span className="block text-xs text-muted-foreground">
-                                {format(new Date(item.movement_date), "HH:mm")}
-                              </span>
-                            </td>
-                            <td>
-                              {item.equipment ? (
-                                <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-muted rounded-lg">
-                                    <EquipmentIcon type={item.equipment.type} />
-                                  </div>
-                                  <div>
-                                    <span className="font-medium text-foreground block">
-                                      {item.equipment.brand} {item.equipment.model}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {item.equipment.serial_number}
-                                    </span>
-                                  </div>
+                  <ResponsiveTable
+                    isMobile={isMobile}
+                    columns={[
+                      "Fecha",
+                      "Equipo",
+                      "Edificio",
+                      "Origen",
+                      "Destino",
+                      "Receptor",
+                      "Responsable",
+                      "Descripcion",
+                    ]}
+                  >
+                    {isMobile ? (
+                      filteredMovements.map((item) => (
+                        <ResponsiveTableRow key={item.id} isMobile label={`Movimiento ${item.id}`}>
+                          <ResponsiveTableCell isMobile label="Fecha">
+                            {format(new Date(item.movement_date), "dd MMM yyyy", { locale: es })}
+                            <span className="block text-xs text-muted-foreground">
+                              {format(new Date(item.movement_date), "HH:mm")}
+                            </span>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Equipo">
+                            {item.equipment ? (
+                              <div className="flex items-center justify-end gap-3">
+                                <div className="p-2 bg-muted rounded-lg">
+                                  <EquipmentIcon type={item.equipment.type} />
                                 </div>
-                              ) : (
-                                <span className="text-muted-foreground italic">Equipo eliminado</span>
-                              )}
-                            </td>
-                            <td>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
-                                {item.origin_department}
-                              </span>
-                            </td>
-                            <td>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                                {item.destination_department}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                                  {item.recipient
-                                    .split(" ")
-                                    .map((n) => n[0])
-                                    .join("")
-                                    .slice(0, 2)
-                                    .toUpperCase()}
+                                <div className="text-right">
+                                  <span className="font-medium text-foreground block">
+                                    {item.equipment.brand} {item.equipment.model}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Código: {item.equipment.asset_code || "N/A"}
+                                  </span>
                                 </div>
-                                <span className="text-foreground">{item.recipient}</span>
                               </div>
-                            </td>
-                            <td className="text-muted-foreground">{item.assigner_name}</td>
-                            <td className="text-muted-foreground max-w-[200px] truncate">
-                              {item.description || <span className="italic">Sin descripción</span>}
-                            </td>
+                            ) : (
+                              <span className="text-muted-foreground italic">Equipo eliminado</span>
+                            )}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Edificio">
+                            {getDestinationBuilding(item.destination_department)}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Origen">
+                            {item.origin_department}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Destino">
+                            {item.destination_department}
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Receptor">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                {item.recipient
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </div>
+                              <span className="text-foreground">{item.recipient}</span>
+                            </div>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Responsable">
+                            <span className="text-muted-foreground">{item.assigner_name}</span>
+                          </ResponsiveTableCell>
+                          <ResponsiveTableCell isMobile label="Descripcion">
+                            <span className="text-muted-foreground">
+                              {item.description || "Sin descripcion"}
+                            </span>
+                          </ResponsiveTableCell>
+                        </ResponsiveTableRow>
+                      ))
+                    ) : (
+                      <>
+                        <ResponsiveTableHead isMobile={false}>
+                          <tr className="border-b border-border">
+                            <ResponsiveTableHeaderCell>Fecha</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Equipo</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Edificio</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Origen</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Destino</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Receptor</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Responsable</ResponsiveTableHeaderCell>
+                            <ResponsiveTableHeaderCell>Descripcion</ResponsiveTableHeaderCell>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </ResponsiveTableHead>
+                        <tbody>
+                          {filteredMovements.map((item) => (
+                            <ResponsiveTableRow key={item.id} isMobile={false}>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground whitespace-nowrap">
+                                {format(new Date(item.movement_date), "dd MMM yyyy", { locale: es })}
+                                <span className="block text-xs text-muted-foreground">
+                                  {format(new Date(item.movement_date), "HH:mm")}
+                                </span>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                {item.equipment ? (
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-muted rounded-lg">
+                                      <EquipmentIcon type={item.equipment.type} />
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-foreground block">
+                                        {item.equipment.brand} {item.equipment.model}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        Código: {item.equipment.asset_code || "N/A"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic">Equipo eliminado</span>
+                                )}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-foreground">
+                                {getDestinationBuilding(item.destination_department)}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
+                                  {item.origin_department}
+                                </span>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                                  {item.destination_department}
+                                </span>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                                    {item.recipient
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")
+                                      .slice(0, 2)
+                                      .toUpperCase()}
+                                  </div>
+                                  <span className="text-foreground">{item.recipient}</span>
+                                </div>
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-muted-foreground">
+                                {item.assigner_name}
+                              </ResponsiveTableCell>
+                              <ResponsiveTableCell isMobile={false} className="text-muted-foreground max-w-[200px] truncate">
+                                {item.description || <span className="italic">Sin descripción</span>}
+                              </ResponsiveTableCell>
+                            </ResponsiveTableRow>
+                          ))}
+                        </tbody>
+                      </>
+                    )}
+                  </ResponsiveTable>
 
-                  {/* Results count */}
                   <div className="flex items-center justify-between px-4 py-4 border-t border-border">
                     <p className="text-sm text-muted-foreground">
                       Mostrando <span className="font-medium text-foreground">{filteredMovements.length}</span> de{" "}

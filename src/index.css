@@ -35,6 +35,10 @@
     --ring: 217 91% 60%;
 
     --radius: 0.5rem;
+    
+    /* WCAG AA Compliant Contrast Colors */
+    --focus-ring: 217 91% 60%;
+    --text-secondary: 215 16% 47%; /* 4.5:1 contrast ratio */
 
     /* Status colors */
     --status-active: 142 76% 36%;
@@ -78,6 +82,9 @@
 
     --popover: 222 47% 15%;
     --popover-foreground: 210 40% 98%;
+    
+    /* WCAG AA Compliant Dark Mode */
+    --text-secondary: 215 16% 70%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
@@ -170,5 +177,35 @@
 
   .filter-card {
     @apply bg-card rounded-xl border border-border p-5;
+  }
+  
+  /* WCAG AA Focus Improvements */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply outline-2 outline-offset-2 outline-blue-500;
+  }
+  
+  /* Touch-friendly buttons - minimum 44px */
+  button, [role="button"] {
+    @apply min-h-11 min-w-11;
+  }
+  
+  /* Responsive spacing adjustments */
+  @media (max-width: 768px) {
+    h1 { @apply text-2xl; }
+    h2 { @apply text-xl; }
+    h3 { @apply text-lg; }
+    
+    .stat-card {
+      @apply p-4;
+    }
+    
+    .data-table th,
+    .data-table td {
+      @apply px-2 py-2 text-xs;
+    }
   }
 }

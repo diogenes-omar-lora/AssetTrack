@@ -17,6 +17,7 @@ import { useEquipment } from "@/hooks/useEquipment";
 import { useAuth } from "@/hooks/useAuth";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useEquipmentTypes } from "@/hooks/useEquipmentTypes";
+import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
 type EquipmentType = Database["public"]["Enums"]["equipment_type"];
@@ -31,6 +32,7 @@ export default function EquipmentForm() {
   const { createEquipment, updateEquipment, getEquipmentById } = useEquipment();
   const { departments } = useDepartments();
   const { types: equipmentTypes } = useEquipmentTypes();
+  const { toast } = useToast();
   
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -69,6 +71,7 @@ export default function EquipmentForm() {
         if (equipment) {
           // Usar current_building si existe, sino calcular del departamento
           let buildingForDept = equipment.current_building?.toLowerCase() || "";
+          let departmentValue = equipment.current_department || "";
           
           if (!buildingForDept && equipment.current_department) {
             // Fallback: encontrar el edificio del departamento
@@ -76,6 +79,22 @@ export default function EquipmentForm() {
               departments
                 .find((d) => d.name === equipment.current_department)
                 ?.building?.toLowerCase() || "";
+          }
+
+          // SINCRONIZACIÓN: Si hay departamento, usar su edificio como source of truth
+          if (departmentValue) {
+            const deptInfo = departments.find((d) => d.name === departmentValue);
+            if (deptInfo?.building) {
+              const correctBuilding = deptInfo.building.toLowerCase();
+              // Si el building del equipo no coincide con el del departamento, sincronizar
+              if (buildingForDept !== correctBuilding) {
+                toast({
+                  title: "Sincronización automática",
+                  description: `El edificio de "${departmentValue}" se ha actualizado a "${correctBuilding}".`,
+                });
+                buildingForDept = correctBuilding;
+              }
+            }
           }
 
           setFormData({
@@ -86,7 +105,7 @@ export default function EquipmentForm() {
             status: equipment.status,
             acquisition_date: equipment.acquisition_date || "",
             current_building: buildingForDept,
-            current_department: equipment.current_department || "",
+            current_department: departmentValue,
             notes: "",
             asset_code: equipment.asset_code || "",
           });
@@ -101,6 +120,21 @@ export default function EquipmentForm() {
     
     if (!formData.type) {
       return;
+    }
+
+    // VALIDACIÓN: Verificar compatibilidad edificio-departamento
+    if (formData.current_building && formData.current_department) {
+      const deptInfo = departments.find((d) => d.name === formData.current_department);
+      const isDeptCompatible = deptInfo?.building?.toLowerCase() === formData.current_building.toLowerCase();
+      
+      if (!isDeptCompatible) {
+        toast({
+          variant: "destructive",
+          title: "Error de validación",
+          description: `El departamento "${formData.current_department}" no pertenece al edificio "${formData.current_building}". Por favor, seleccione un departamento compatible.`,
+        });
+        return;
+      }
     }
 
     setIsLoading(true);
