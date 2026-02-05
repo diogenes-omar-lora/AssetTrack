@@ -154,6 +154,7 @@ export function useEquipmentStats() {
         Tablet: data.filter((e) => e.type === "Tablet").length,
         Impresora: data.filter((e) => e.type === "Impresora").length,
         Servidor: data.filter((e) => e.type === "Servidor").length,
+        Teléfono: data.filter((e) => e.type === "Teléfono").length,
         Otro: data.filter((e) => e.type === "Otro").length,
       };
 

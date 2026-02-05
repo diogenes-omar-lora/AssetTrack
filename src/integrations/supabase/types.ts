@@ -208,7 +208,7 @@ export type Database = {
         | "Asignado"
         | "En reparación"
         | "Dado de baja"
-      equipment_type: "Laptop" | "Monitor" | "Teléfono" | "Otro"
+      equipment_type: "Laptop" | "Monitor" | "CPU" | "Tablet" | "Impresora" | "Servidor" | "Teléfono" | "Otro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -343,7 +343,7 @@ export const Constants = {
         "En reparación",
         "Dado de baja",
       ],
-      equipment_type: ["Laptop", "Monitor", "Teléfono", "Otro"],
+      equipment_type: ["Laptop", "Monitor", "CPU", "Tablet", "Impresora", "Servidor", "Teléfono", "Otro"],
     },
   },
 } as const

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { FileText, Download, Filter, TrendingUp, Wrench, Users, Monitor, Loader2, Laptop, Phone, Package, ArrowLeftRight, Tablet, Printer, Server } from "lucide-react";
+import * as XLSX from "xlsx";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -172,49 +173,42 @@ export default function Reports() {
   }, [movements, movementDateRange, originDept, destDept]);
 
   const handleExportEquipmentCSV = () => {
-    const headers = ["Número de Serie", "Marca", "Modelo", "Tipo", "Asignado A", "Departamento", "Fecha Adquisición", "Estado"];
-    const rows = filteredEquipment.map((item) => [
-      item.serial_number,
-      item.brand,
-      item.model,
-      item.type,
-      item.current_assignee || "Sin asignar",
-      item.current_department || "Sin departamento",
-      item.acquisition_date ? format(new Date(item.acquisition_date), "dd/MM/yyyy") : "N/A",
-      item.status,
-    ]);
+    const headers = ["Número de Serie", "Código de Activo", "Marca", "Modelo", "Tipo", "Asignado A", "Departamento", "Edificio", "Fecha Adquisición", "Estado"];
+    const rows = filteredEquipment.map((item) => ({
+      "Número de Serie": item.serial_number,
+      "Código de Activo": item.asset_code || "-",
+      "Marca": item.brand,
+      "Modelo": item.model,
+      "Tipo": item.type,
+      "Asignado A": item.current_assignee || "Sin asignar",
+      "Departamento": item.current_department || "Sin departamento",
+      "Edificio": item.current_building || "-",
+      "Fecha Adquisición": item.acquisition_date ? format(new Date(item.acquisition_date), "dd/MM/yyyy") : "N/A",
+      "Estado": item.status,
+    }));
 
-    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reporte-inventario-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
+    XLSX.writeFile(workbook, `reporte-inventario-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
   const handleExportMovementsCSV = () => {
-    const headers = ["Fecha", "Equipo", "Número de Serie", "Origen", "Destino", "Receptor", "Responsable", "Descripción"];
-    const rows = filteredMovements.map((item) => [
-      format(new Date(item.movement_date), "dd/MM/yyyy HH:mm"),
-      item.equipment ? `${item.equipment.brand} ${item.equipment.model}` : "N/A",
-      item.equipment?.serial_number || "N/A",
-      item.origin_department,
-      item.destination_department,
-      item.recipient,
-      item.assigner_name,
-      item.description || "",
-    ]);
+    const rows = filteredMovements.map((item) => ({
+      "Fecha": format(new Date(item.movement_date), "dd/MM/yyyy HH:mm"),
+      "Equipo": item.equipment ? `${item.equipment.brand} ${item.equipment.model}` : "N/A",
+      "Número de Serie": item.equipment?.serial_number || "N/A",
+      "Origen": item.origin_department,
+      "Destino": item.destination_department,
+      "Receptor": item.recipient,
+      "Responsable": item.assigner_name,
+      "Descripción": item.description || "",
+    }));
 
-    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reporte-movimientos-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Movimientos");
+    XLSX.writeFile(workbook, `reporte-movimientos-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
   };
 
   const utilizationRate = stats ? Math.round((stats.assigned / stats.total) * 100) || 0 : 0;
@@ -319,7 +313,7 @@ export default function Reports() {
             <div className="flex justify-end">
               <Button variant="outline" onClick={handleExportEquipmentCSV} disabled={filteredEquipment.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
-                Exportar a CSV
+                Exportar a Excel
               </Button>
             </div>
 
@@ -417,6 +411,7 @@ export default function Reports() {
                           <th>Tipo</th>
                           <th>Asignado A</th>
                           <th>Departamento</th>
+                          <th>Edificio</th>
                           <th>Fecha Adquisición</th>
                           <th>Estado</th>
                         </tr>
@@ -452,6 +447,7 @@ export default function Reports() {
                               )}
                             </td>
                             <td className="text-foreground">{item.current_department || <span className="text-muted-foreground italic">N/A</span>}</td>
+                            <td className="text-foreground">{item.current_building || <span className="text-muted-foreground italic">-</span>}</td>
                             <td className="text-muted-foreground">
                               {item.acquisition_date
                                 ? format(new Date(item.acquisition_date), "dd MMM yyyy", { locale: es })
@@ -484,7 +480,7 @@ export default function Reports() {
             <div className="flex justify-end">
               <Button variant="outline" onClick={handleExportMovementsCSV} disabled={filteredMovements.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
-                Exportar a CSV
+                Exportar a Excel
               </Button>
             </div>
 

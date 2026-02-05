@@ -116,6 +116,7 @@ export default function EquipmentForm() {
           acquisition_date: formData.acquisition_date || null,
           current_building: formData.current_building?.toLowerCase() || null,
           current_department: formData.current_department || null,
+          asset_code: formData.asset_code || null,
         };
         
         await updateEquipment.mutateAsync({
@@ -132,6 +133,7 @@ export default function EquipmentForm() {
           acquisition_date: formData.acquisition_date || null,
           current_building: formData.current_building?.toLowerCase() || null,
           current_department: formData.current_department || null,
+          asset_code: formData.asset_code || null,
           created_by: user?.id,
         };
         

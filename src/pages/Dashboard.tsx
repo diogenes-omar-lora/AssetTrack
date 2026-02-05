@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp, TrendingDown, Monitor, Laptop, ClipboardList, Wrench, Phone, Tablet, Printer, Server } from "lucide-react";
+import { TrendingUp, TrendingDown, Monitor, Laptop, ClipboardList, Wrench, Phone, Tablet, Printer, Server, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { useEquipmentStats } from "@/hooks/useEquipment";
 import { useMovements, MovementWithEquipment } from "@/hooks/useMovements";
+import { useDepartments } from "@/hooks/useDepartments";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format } from "date-fns";
 
 // Colors for department chart
@@ -66,9 +74,10 @@ const getEquipmentIcon = (type: string) => {
 interface DepartmentChartProps {
   data: { name: string; value: number }[];
   total: number;
+  selectedBuilding?: string;
 }
 
-function DepartmentChart({ data, total }: DepartmentChartProps) {
+function DepartmentChart({ data, total, selectedBuilding }: DepartmentChartProps) {
   const chartData = useMemo(() => {
     return data.map((item, index) => ({
       ...item,
@@ -130,8 +139,36 @@ function DepartmentChart({ data, total }: DepartmentChartProps) {
 export default function Dashboard() {
   const { data: statsData, isLoading: statsLoading } = useEquipmentStats();
   const { movements, isLoading: movementsLoading } = useMovements();
+  const { departments } = useDepartments();
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedBuilding, setSelectedBuilding] = useState<string>("all");
   const itemsPerPage = 10;
+
+  // Obtener edificios únicos
+  const buildings = useMemo(() => {
+    const uniqueBuildings = Array.from(
+      new Set(departments.map((d) => d.building).filter((b): b is string => !!b))
+    ).sort((a, b) => a.localeCompare(b));
+    return uniqueBuildings;
+  }, [departments]);
+
+  // Filtrar departamentos por edificio seleccionado
+  const filteredDepartments = useMemo(() => {
+    if (selectedBuilding === "all") {
+      return statsData?.byDepartment || [];
+    }
+    const deptNames = departments
+      .filter((d) => d.building === selectedBuilding)
+      .map((d) => d.name);
+    return (statsData?.byDepartment || []).filter((dept) =>
+      deptNames.includes(dept.name)
+    );
+  }, [selectedBuilding, statsData?.byDepartment, departments]);
+
+  // Calcular total filtrado
+  const filteredTotal = useMemo(() => {
+    return filteredDepartments.reduce((sum, dept) => sum + dept.value, 0);
+  }, [filteredDepartments]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -231,6 +268,22 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">Equipos por Departamento</h3>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedBuilding} onValueChange={setSelectedBuilding}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Todos los edificios" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los edificios</SelectItem>
+                    {buildings.map((building) => (
+                      <SelectItem key={building} value={building}>
+                        {building}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             {statsLoading ? (
               <div className="flex items-center gap-8">
@@ -243,8 +296,9 @@ export default function Dashboard() {
               </div>
             ) : (
               <DepartmentChart 
-                data={statsData?.byDepartment || []} 
-                total={statsData?.total || 0} 
+                data={filteredDepartments} 
+                total={filteredTotal}
+                selectedBuilding={selectedBuilding}
               />
             )}
           </div>
