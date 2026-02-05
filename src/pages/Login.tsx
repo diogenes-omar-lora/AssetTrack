@@ -60,6 +60,16 @@ const animationStyles = `
     animation: fadeIn 0.5s ease-in-out;
   }
 
+  .tab-content-size {
+    min-height: 340px;
+  }
+
+  @media (min-width: 640px) {
+    .tab-content-size {
+      min-height: 360px;
+    }
+  }
+
   .input-smooth {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -154,7 +164,7 @@ export default function Login() {
             <TabsTrigger value="register" className="transition-all duration-300">Registrarse</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="login" className="tab-content-fade">
+          <TabsContent value="login" className="tab-content-fade tab-content-size">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2 slide-in-up" style={{ animationDelay: "0.1s" }}>
                 <Label htmlFor="login-email" className="text-sm font-medium">Correo Electrónico</Label>
@@ -219,7 +229,7 @@ export default function Login() {
             </form>
           </TabsContent>
 
-          <TabsContent value="register" className="tab-content-fade">
+          <TabsContent value="register" className="tab-content-fade tab-content-size">
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2 slide-in-up" style={{ animationDelay: "0.1s" }}>
                 <Label htmlFor="register-name" className="text-sm font-medium">Nombre Completo</Label>
