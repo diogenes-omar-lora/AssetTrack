@@ -10,6 +10,7 @@ interface Profile {
   full_name: string | null;
   department: string | null;
   role: string | null;
+  status: string | null;
 }
 
 interface AuthContextType {
@@ -78,6 +79,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let isMounted = true;
+
+    const channel = supabase
+      .channel(`profile-status-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "profiles",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!isMounted) return;
+          if (payload.eventType === "DELETE") {
+            setProfile(null);
+            return;
+          }
+          setProfile(payload.new as Profile);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const signUp = async (email: string, password: string, fullName: string) => {
     const { error } = await supabase.auth.signUp({
       email,
@@ -106,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -118,6 +151,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: error.message,
       });
       throw error;
+    }
+
+    if (data?.user?.id) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (profileData?.status === "inactive") {
+        await supabase.auth.signOut();
+        const inactiveError = new Error("Tu cuenta esta inactiva.");
+        toast({
+          variant: "destructive",
+          title: "Cuenta inactiva",
+          description: inactiveError.message,
+        });
+        throw inactiveError;
+      }
     }
 
     toast({

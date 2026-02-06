@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, Monitor, User, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,7 @@ const animationStyles = `
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signIn, signUp, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -106,6 +107,14 @@ export default function Login() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changePasswordError, setChangePasswordError] = useState("");
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const message = (location.state as { message?: string } | null)?.message;
+    if (message) {
+      setAuthMessage(message);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (loading) return;
@@ -339,6 +348,12 @@ export default function Login() {
           </TabsList>
 
           <TabsContent value="login" className="tab-content-fade tab-content-size">
+            {authMessage && (
+              <Alert className="mb-4 slide-in-up" style={{ animationDelay: "0.05s" }}>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authMessage}</AlertDescription>
+              </Alert>
+            )}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2 slide-in-up" style={{ animationDelay: "0.1s" }}>
                 <Label htmlFor="login-email" className="text-sm font-medium">Correo Electrónico</Label>

@@ -27,15 +27,42 @@ export function useCreateUser() {
 
   return useMutation({
     mutationFn: async ({ email, password, fullName, department, role, status }: CreateUserParams) => {
-      // Create user via edge function (needs service role key)
-      const { data, error } = await supabase.functions.invoke("create-user", {
-        body: { email, password, fullName, department, role, status },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
       
-      return data;
+      if (!accessToken) {
+        throw new Error("No hay sesión activa o token expirado");
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error("Configuración de Supabase incompleta");
+      }
+
+      // Direct fetch with proper headers
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/create-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseAnonKey}`,
+            "apikey": supabaseAnonKey,
+            "x-user-token": accessToken,
+          },
+          body: JSON.stringify({ email, password, fullName, department, role, status }),
+        }
+      );
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}`);
+      }
+
+      return responseData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allUsersWithRoles"] });

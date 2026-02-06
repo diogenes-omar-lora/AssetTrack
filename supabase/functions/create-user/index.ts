@@ -3,8 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-user-token",
 };
 
 interface CreateUserRequest {
@@ -35,27 +36,65 @@ serve(async (req) => {
     });
 
     // Verify the requesting user is an admin
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header");
+    const userToken = req.headers.get("x-user-token");
+    if (!userToken) {
+      return new Response(
+        JSON.stringify({ error: "User token is required" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const token = userToken.trim();
     
-    if (authError || !requestingUser) {
-      throw new Error("Unauthorized");
+    // Decode JWT manually to get user ID
+    let requestingUserId: string;
+    try {
+      const parts = token.split(".");
+      if (parts.length !== 3) {
+        throw new Error("Invalid JWT format - expected 3 parts, got " + parts.length);
+      }
+
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      
+      // Add padding
+      const paddingNeeded = (4 - base64.length % 4) % 4;
+      const paddedBase64 = base64 + '='.repeat(paddingNeeded);
+
+      const payloadJson = atob(paddedBase64);
+      const payload = JSON.parse(payloadJson);
+      
+      requestingUserId = payload.sub;
+      
+      if (!requestingUserId) {
+        throw new Error("User ID (sub) not found in JWT payload");
+      }
+    } catch (decodeError) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token: " + (decodeError as Error).message }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     // Check if requesting user is admin
-    const { data: roleData } = await supabaseAdmin
+    const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", requestingUser.id)
+      .eq("user_id", requestingUserId)
       .maybeSingle();
 
+    if (roleError) {
+      return new Response(
+        JSON.stringify({ error: "Could not verify user role" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     if (roleData?.role !== "admin") {
-      throw new Error("Solo los administradores pueden crear usuarios");
+      return new Response(
+        JSON.stringify({ error: "Solo los administradores pueden crear usuarios" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     const { email, password, fullName, department, role, status }: CreateUserRequest = await req.json();

@@ -1,41 +1,28 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, profile, signOut } = useAuth();
   const location = useLocation();
-  const [profileStatus, setProfileStatus] = useState<string | null>(null);
-  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
-    async function checkUserStatus() {
-      if (!user) {
-        setCheckingStatus(false);
-        return;
-      }
+    if (profile?.status !== "inactive" || isSigningOut) return;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("status")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    setIsSigningOut(true);
+    signOut()
+      .catch(() => undefined)
+      .finally(() => {
+        setIsSigningOut(false);
+      });
+  }, [profile?.status, signOut, isSigningOut]);
 
-      setProfileStatus(profile?.status ?? null);
-      setCheckingStatus(false);
-    }
-
-    if (!loading) {
-      checkUserStatus();
-    }
-  }, [user, loading]);
-
-  if (loading || checkingStatus) {
+  if (loading || isSigningOut) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -48,13 +35,13 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // Redirect pending users to approval page
-  if (profileStatus === "pending") {
+  if (profile?.status === "pending") {
     return <Navigate to="/pending-approval" replace />;
   }
 
   // Redirect inactive users to login
-  if (profileStatus === "inactive") {
-    return <Navigate to="/login" state={{ message: "Tu cuenta ha sido desactivada." }} replace />;
+  if (profile?.status === "inactive") {
+    return <Navigate to="/login" state={{ message: "Tu cuenta esta inactiva." }} replace />;
   }
 
   return <>{children}</>;
