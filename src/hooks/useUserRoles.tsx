@@ -194,3 +194,66 @@ export function useUpdateUserStatus() {
     },
   });
 }
+
+export function useResetUserPassword() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ userId, temporaryPassword }: { userId: string; temporaryPassword: string }) => {
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      if (!accessToken) {
+        throw new Error("No hay sesión activa o token expirado");
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error("Configuración de Supabase incompleta");
+      }
+
+      const requestBody = {
+        userId,
+        temporaryPassword: temporaryPassword.trim(),
+      };
+
+      // Direct fetch with proper headers
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/reset-user-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseAnonKey}`,
+            "apikey": supabaseAnonKey,
+            "x-user-token": accessToken,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}`);
+      }
+
+      return responseData;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "✓ Contraseña reseteada",
+        description: `Temporal: ${data.temporaryPassword}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message,
+      });
+    },
+  });
+}

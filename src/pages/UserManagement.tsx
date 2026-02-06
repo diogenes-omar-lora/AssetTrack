@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Search, MoreVertical, Shield, User, Loader2, Pencil, Trash2, CheckCircle } from "lucide-react";
+import { Search, MoreVertical, Shield, User, Loader2, Pencil, Trash2, CheckCircle, Lock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +41,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { EditUserDialog } from "@/components/users/EditUserDialog";
 import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
+import { ResetPasswordDialog } from "@/components/users/ResetPasswordDialog";
 
 export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +49,7 @@ export default function UserManagement() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [editingUser, setEditingUser] = useState<UserWithProfile | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserWithProfile | null>(null);
+  const [resettingPasswordUser, setResettingPasswordUser] = useState<UserWithProfile | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -164,6 +166,10 @@ export default function UserManagement() {
 
   const handleUpdateStatus = (userId: string, status: string) => {
     updateStatus.mutate({ userId, status });
+  };
+
+  const handleOpenResetPassword = (user: UserWithProfile) => {
+    setResettingPasswordUser(user);
   };
 
   if (isLoading) {
@@ -308,6 +314,14 @@ export default function UserManagement() {
                           Editar Usuario
                         </DropdownMenuItem>
                         
+                        <DropdownMenuItem
+                          onClick={() => handleOpenResetPassword(u)}
+                          className="text-orange-600"
+                        >
+                          <Lock className="mr-2 h-4 w-4" />
+                          Resetear Contraseña
+                        </DropdownMenuItem>
+                        
                         <DropdownMenuSeparator />
                         
                         <DropdownMenuItem
@@ -414,6 +428,15 @@ export default function UserManagement() {
           user={deletingUser}
           open={!!deletingUser}
           onOpenChange={(open) => !open && setDeletingUser(null)}
+        />
+      )}
+
+      {/* Reset Password Dialog */}
+      {resettingPasswordUser && (
+        <ResetPasswordDialog
+          user={resettingPasswordUser}
+          open={!!resettingPasswordUser}
+          onOpenChange={(open) => !open && setResettingPasswordUser(null)}
         />
       )}
     </div>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, Monitor, User } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Monitor, User, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 // Estilos de animación elegantes
 const animationStyles = `
@@ -92,26 +94,109 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, signIn, signUp, loading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [forcePasswordChecked, setForcePasswordChecked] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState("");
 
   useEffect(() => {
-    if (user && !loading) {
-      navigate("/dashboard");
+    if (loading) return;
+
+    if (!user) {
+      setForcePasswordChange(false);
+      setForcePasswordChecked(false);
+      return;
     }
-  }, [user, loading, navigate]);
+
+    if (forcePasswordChecked) {
+      if (!forcePasswordChange) {
+        navigate("/dashboard");
+      }
+      return;
+    }
+
+    const checkForcePasswordChange = async () => {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("force_password_change")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      const needsChange = !error && profile && (profile as any).force_password_change === true;
+      setForcePasswordChange(needsChange);
+      setForcePasswordChecked(true);
+
+      if (!needsChange) {
+        navigate("/dashboard");
+      }
+    };
+
+    checkForcePasswordChange();
+  }, [user, loading, navigate, forcePasswordChange, forcePasswordChecked]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setChangePasswordError("");
     try {
       await signIn(email, password);
-      navigate("/dashboard");
+      setForcePasswordChecked(false);
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (error) {
       // Error handled in useAuth
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError("");
+    
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError("Las contraseñas no coinciden");
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      setChangePasswordError("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Update profile to remove force_password_change flag
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        await supabase
+          .from("profiles")
+          .update({
+            force_password_change: false,
+          } as any)
+          .eq("user_id", currentUser.id);
+      }
+
+      setForcePasswordChange(false);
+      navigate("/dashboard");
+    } catch (error: any) {
+      setChangePasswordError(error.message || "Error al cambiar la contraseña");
     } finally {
       setIsSubmitting(false);
     }
@@ -134,6 +219,95 @@ export default function Login() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If force password change is needed
+  if (forcePasswordChange) {
+    return (
+      <div className="login-background min-h-screen flex flex-col items-center justify-center p-4">
+        <style>{animationStyles}</style>
+        
+        <div className="scale-in-smooth w-full max-w-md bg-card rounded-2xl shadow-xl p-8">
+          <div className="flex justify-center mb-6 scale-in-smooth" style={{ animationDelay: "0.1s" }}>
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-orange-500/10">
+              <AlertCircle className="h-7 w-7 text-orange-500" />
+            </div>
+          </div>
+
+          <div className="text-center mb-6 slide-in-up" style={{ animationDelay: "0.2s" }}>
+            <h1 className="text-2xl font-bold text-foreground">Cambio de Contraseña Requerido</h1>
+            <p className="text-muted-foreground mt-2">Tu contraseña temporal ha expirado. Por favor, establece una nueva contraseña.</p>
+          </div>
+
+          {changePasswordError && (
+            <Alert variant="destructive" className="mb-4 slide-in-up" style={{ animationDelay: "0.25s" }}>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{changePasswordError}</AlertDescription>
+            </Alert>
+          )}
+
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2 slide-in-up" style={{ animationDelay: "0.3s" }}>
+              <Label htmlFor="new-password" className="text-sm font-medium">Nueva Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="new-password"
+                  type={showNewPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pl-10 pr-10 input-smooth border-border focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 slide-in-up" style={{ animationDelay: "0.35s" }}>
+              <Label htmlFor="confirm-password" className="text-sm font-medium">Confirmar Contraseña</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="pl-10 pr-10 input-smooth border-border focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full button-smooth slide-in-up" 
+              style={{ animationDelay: "0.4s" }} 
+              size="lg" 
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Cambiando..." : "Cambiar Contraseña"}
+            </Button>
+          </form>
+        </div>
       </div>
     );
   }
